@@ -20,6 +20,7 @@ public:
 private:
 	Ui::MainWindow *ui;
 	MCIPC *m_ipc;
+	QMap<QString,int> m_messageCountMap;
 private slots:
 	void ipcConnected();
 	void publishMessage(QString name,QByteArray payload);
