@@ -13,6 +13,7 @@ MainWindow::MainWindow(QWidget *parent) :
 	m_ipc = new MCIPC("mcdebug",this);
 	connect(m_ipc,SIGNAL(si_connected()),this,SLOT(ipcConnected()));
 	connect(m_ipc,SIGNAL(si_publishMessage(QString,QByteArray)),this,SLOT(publishMessage(QString,QByteArray)));
+	connect(m_ipc,SIGNAL(si_disconnected()),this,SLOT(ipcDisconnected()));
 	m_ipc->connectToHost("127.0.0.1",12345);
 	ui->treeWidget->setColumnCount(2);
 }
@@ -32,8 +33,16 @@ void MainWindow::ipcConnected()
 	payload.append(0x03);
 	m_ipc->publishMessage("MyMessage",payload);
 	m_ipc->subscribeMessage("core/status");
-	m_ipc->subscribeMessage("SysInfoProvider/sysinfo");
+	m_ipc->subscribeMessage("GpsProvider/navdata");
+//	m_ipc->subscribeMessage("SysInfoProvider/sysinfo");
 }
+void MainWindow::ipcDisconnected()
+{
+	qDebug() << "IPC Disconnected! This means the master has died";
+	qDebug() << "TODO: Handle this gracefully, reconnects maybe?";
+	exit(-1);
+}
+
 void MainWindow::publishMessage(QString name,QByteArray payload)
 {
 	qDebug() << name << payload;
@@ -51,6 +60,7 @@ void MainWindow::publishMessage(QString name,QByteArray payload)
 			}
 			QList<QTreeWidgetItem*> itemlist = ui->treeWidget->findItems(subscribername,Qt::MatchExactly);
 			QTreeWidgetItem *item = 0;
+			QJsonArray sublist = subscriber.value("subscribers").toArray();
 			if (itemlist.size() == 0)
 			{
 				//Nothing in the tree, add it!
@@ -58,11 +68,13 @@ void MainWindow::publishMessage(QString name,QByteArray payload)
 				ui->treeWidget->addTopLevelItem(item);
 				item->addChild(new QTreeWidgetItem(QStringList() << "Count" << "0"));
 				item->addChild(new QTreeWidgetItem(QStringList() << "Freq" << "0"));
+				item->addChild(new QTreeWidgetItem(QStringList() << "Subscribers" << "0"));
 			}
 			else
 			{
 				item = itemlist.at(0);
 			}
+
 			for (int j=0;j<item->childCount();j++)
 			{
 				if (item->child(j)->text(0) == "Count")
@@ -76,8 +88,29 @@ void MainWindow::publishMessage(QString name,QByteArray payload)
 					item->child(j)->setText(1,QString::number(messagecount) + "hz");
 					m_messageCountMap[subscribername] = subscriber.value("count").toInt();
 				}
+				else if (item->child(j)->text(0) == "Subscribers")
+				{
+					item->child(j)->setText(1,QString::number(sublist.size()));
+					while (item->child(j)->childCount() > 0)
+					{
+						item->child(j)->removeChild(item->child(j)->child(0));
+					}
+					for (int k=0;k<sublist.size();k++)
+					{
+						item->child(j)->addChild(new QTreeWidgetItem(QStringList() << sublist.at(k).toString() << ""));
+					}
+				}
 
 			}
+		}
+	}
+	else if (name == "GpsProvider/navdata")
+	{
+		ui->plainTextEdit->clear();
+		QJsonObject top = QJsonDocument::fromJson(payload).object();
+		for (QJsonObject::const_iterator i = top.constBegin();i!=top.constEnd();i++)
+		{
+			ui->plainTextEdit->appendPlainText(i.key() + +":"+i.value().toVariant().toString());
 		}
 	}
 }

@@ -23,6 +23,7 @@ private:
 	QMap<QString,int> m_messageCountMap;
 private slots:
 	void ipcConnected();
+	void ipcDisconnected();
 	void publishMessage(QString name,QByteArray payload);
 };
 
