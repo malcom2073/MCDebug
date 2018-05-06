@@ -10,6 +10,15 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui(new Ui::MainWindow)
 {
 	ui->setupUi(this);
+
+	ui->coreStatusTableWidget->setColumnCount(2);
+	ui->coreStatusTableWidget->setRowCount(10);
+	ui->coreStatusTableWidget->verticalHeader()->setVisible(false);
+	ui->coreStatusTableWidget->horizontalHeader()->setVisible(false);
+	ui->coreStatusTableWidget->setItem(0,0,new QTableWidgetItem("Connected"));
+	ui->coreStatusTableWidget->setItem(0,1,new QTableWidgetItem("False"));
+
+
 	m_ipc = new MCIPC("mcdebug",this);
 	connect(m_ipc,SIGNAL(si_connected()),this,SLOT(ipcConnected()));
 	connect(m_ipc,SIGNAL(si_publishMessage(QString,QByteArray)),this,SLOT(publishMessage(QString,QByteArray)));
@@ -24,6 +33,7 @@ MainWindow::~MainWindow()
 }
 void MainWindow::ipcConnected()
 {
+	ui->coreStatusTableWidget->setItem(0,1,new QTableWidgetItem("True"));
 	//m_ipc->sendM
 	qDebug() << "Sending test-advert";
 //	m_ipc->advertizeMessage("test-advert");
@@ -49,10 +59,11 @@ void MainWindow::publishMessage(QString name,QByteArray payload)
 	if (name == "core/status")
 	{
 		QJsonDocument doc = QJsonDocument::fromJson(payload);
-		QJsonArray top = doc.array();
-		for (int i=0;i<top.size();i++)
+		QJsonObject top = doc.object();
+		QJsonArray subscribersarray = top.value("subscribers").toArray();
+		for (int i=0;i<subscribersarray.size();i++)
 		{
-			QJsonObject subscriber = top.at(i).toObject();
+			QJsonObject subscriber = subscribersarray.at(i).toObject();
 			QString subscribername = subscriber.value("name").toString();
 			if (!m_messageCountMap.contains(subscribername))
 			{
